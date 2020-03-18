@@ -114,6 +114,7 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
         y is an 3d array of function to interpolate where the last dimension is to be interpolated [..., N]
         x is a 3d array equal of locations to eval and is monotonically increasing
         '''
+        x_max = x_max - 1
         valid_x = (x > x_min) & (x < x_max)
         x = tf.clip_by_value(x, x_min, x_max)
         x_floor = tf.cast(tf.math.floor(x), tf.int32)

@@ -134,7 +134,7 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
         delays is a 3D array of shape (transmits, channels, axial_samples)
         returns delayed data
         '''
-        return self.batch_interp1d(delays, 0, tf.cast(delays.shape[-1], delays.dtype), data)
+        return DukeUltranet.batch_interp1d(delays, 0, tf.cast(delays.shape[-1], delays.dtype), data)
     
     @staticmethod
     @tf.function

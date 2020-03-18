@@ -9,7 +9,6 @@ import h5py
 import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_datasets.public_api as tfds
-import tensorflow_probability as tfp
 from scipy import signal
 
 # TODO(duke_ultranet): BibTeX citation
@@ -107,7 +106,27 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
     @tf.function
     def tf_db(x):
         return tf.constant(20, dtype=x.dtype) * DukeUltranet.tf_log10(x)
+    
+    @staticmethod
+    @tf.function
+    def batch_interp1d(x, x_min, x_max, y):
+        '''
+        y is an 3d array of function to interpolate where the last dimension is to be interpolated [..., N]
+        x is a 3d array equal of locations to eval and is monotonically increasing
+        '''
+        valid_x = (x > x_min) & (x < x_max)
+        x = tf.clip_by_value(x, x_min, x_max)
+        x_floor = tf.cast(tf.math.floor(x), tf.int32)
+        x_ceil = tf.cast(tf.math.ceil(x), tf.int32)
 
+        y_floor = tf.gather(y, x_floor, axis=-1, batch_dims=2)
+        y_ceil = tf.gather(y, x_ceil, axis=-1, batch_dims=2)
+        delta = (y_ceil - y_floor)*(tf.cast(x_ceil, y.dtype) - x)
+        out = y + delta
+        out = out * tf.cast(valid_x, y.dtype)
+        return out
+    
+    
     @staticmethod    
     def apply_delays(delays, data):
         '''
@@ -115,8 +134,7 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
         delays is a 3D array of shape (transmits, channels, axial_samples)
         returns delayed data
         '''
-        interp1 = tfp.math.batch_interp_regular_1d_grid
-        return interp1(delays, 0, tf.cast(delays.shape[-1], delays.dtype), data, axis=-1, fill_value=0)
+        return self.batch_interp1d(delays, 0, tf.cast(delays.shape[-1], delays.dtype), data)
     
     @staticmethod
     @tf.function

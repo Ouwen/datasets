@@ -36,7 +36,7 @@ _TX_POS = np.array([-1.3188923611111137e-02, -1.2874774305555581e-02, -1.2560625
 _SUB_APERTURE_SIZE = 96
 _CHANNELS = 180
 
-class DukeUltranet(tfds.core.GeneratorBasedBuilder):
+class DukeUltranet(tfds.core.BeamBasedBuilder):
     """TODO(duke_ultranet): Short description of my dataset."""
 
     VERSION = tfds.core.Version('0.1.0')
@@ -263,20 +263,21 @@ class DukeUltranet(tfds.core.GeneratorBasedBuilder):
             tfds.core.SplitGenerator(
                     name=tfds.Split.TRAIN,
                     gen_kwargs={
-                        'files': _FILES[:10]
+                        'files': _FILES[:3000]
                     },
             ),
             tfds.core.SplitGenerator(
                     name=tfds.Split.TEST,
                     gen_kwargs={
-                        'files': _FILES[10:20]
+                        'files': _FILES[3000:]
                     },
             ),
         ]
 
-    def _generate_examples(self, files):
-        """Yields examples."""
-        for file_num in files:
+    def _build_pcollection(self, pipeline, files):
+        beam = tfds.core.lazy_imports.apache_beam
+
+        def _process(file_num):
             metadata_filepath = 'gs://duke-research-us/hindexbooster/results/val_{}/structs_42.mat'.format(file_num)
             target_jpeg_filepath = 'gs://duke-research-us/hindexbooster/images/val_{}.JPEG'.format(file_num+5000)
             body_jpeg_filepath = 'gs://duke-research-us/hindexbooster/images/val_{}.JPEG'.format(file_num)
@@ -345,7 +346,7 @@ class DukeUltranet(tfds.core.GeneratorBasedBuilder):
             b = common['probe']['b'].astype(np.float32)
             
             # Download RF data
-            with futures.ThreadPoolExecutor(len(_TX_POS)) as executor:
+            with futures.ThreadPoolExecutor() as executor:
                 rf = executor.map(self.get_rf_hdf5, filepaths_rf)
             rf = list(rf)
             nowall = np.stack([r['nowall'] for r in rf])
@@ -390,7 +391,13 @@ class DukeUltranet(tfds.core.GeneratorBasedBuilder):
                 }
             m.close()
         
-        yield file_num, {
-            'data': varying,
-            'params': common
-        }
+            yield file_num, {
+                'data': varying,
+                'params': common
+            }
+
+        return (
+            pipeline
+            | beam.Create(files)
+            | beam.FlatMap(_process)
+        )

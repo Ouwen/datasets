@@ -392,6 +392,8 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
                 s = tf.cast(s, tf.float32)
                 nowall = self.apply_delays(s, nowall)[..., 3117:6234].numpy().astype(np.float16)
                 wall = self.apply_delays(s, wall)[..., 3117:6234].numpy().astype(np.float16)
+                s = None
+
                 varying = {
                     'without_wall': nowall,
                     'with_wall': wall

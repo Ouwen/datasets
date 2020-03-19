@@ -281,7 +281,7 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
             tfds.core.SplitGenerator(
                     name=tfds.Split.TRAIN,
                     gen_kwargs={
-                        'files': _FILES
+                        'files': _FILES[:100]
                     }
             )
         ]

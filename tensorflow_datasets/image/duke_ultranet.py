@@ -3,13 +3,12 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-from concurrent import futures
 
-import h5py
 import numpy as np
 import tensorflow.compat.v2 as tf
 import tensorflow_datasets.public_api as tfds
 from scipy import signal
+import h5py
 
 # TODO(duke_ultranet): BibTeX citation
 _CITATION = """
@@ -25,7 +24,7 @@ _DESCRIPTION = {
 _HOMEPAGE = """
 """
 
-_BUCKET = 'gs://duke-research-us/hindexbooster/results'
+_BUCKET = 'gs://duke-research-us/hindexbooster'
 
 _NAN_FILES = {2049, 4, 5, 7, 4104, 2057, 4106, 4107, 2062, 4110, 4111, 4112, 4116, 4119, 25, 2074, 4122, 4124, 32, 2080, 4131, 2084, 4137, 2096, 4148, 54, 4152, 57, 4157, 4159, 2113, 67, 2115, 4166, 71, 72, 73, 2122, 2124, 4176, 2130, 2131, 85, 2135, 2136, 4183, 4185, 2140, 4193, 4197, 4199, 2152, 4210, 2169, 4217, 124, 2174, 4223, 4226, 4228, 2181, 4231, 4232, 137, 4234, 2187, 4236, 2190, 2193, 146, 2198, 2199, 4246, 2203, 158, 2207, 2209, 2213, 166, 2214, 170, 2220, 4269, 174, 2228, 2234, 187, 4284, 195, 2244, 201, 4299, 2252, 4300, 4301, 4307, 2264, 2267, 4319, 225, 228, 4329, 2282, 236, 4334, 2289, 243, 251, 4348, 253, 259, 265, 271, 272, 4367, 4369, 275, 4371, 2325, 4377, 288, 2338, 292, 4388, 309, 2357, 4405, 312, 315, 2364, 4415, 321, 2369, 2372, 2374, 2376, 4427, 4429, 337, 4441, 346, 4443, 4451, 4455, 2418, 4469, 2428, 4481, 2435, 388, 390, 4488, 4493, 4495, 4502, 408, 411, 420, 4516, 422, 4517, 424, 425, 4518, 4520, 428, 4521, 4523, 432, 4528, 2483, 436, 443, 444, 2491, 4543, 453, 2502, 2504, 2508, 4557, 462, 2511, 4560, 2515, 4568, 2522, 2525, 4573, 482, 488, 2536, 4585, 2539, 493, 494, 2545, 4596, 502, 514, 518, 2566, 2571, 4619, 4620, 4621, 2576, 532, 2587, 540, 542, 544, 548, 2597, 550, 552, 562, 2611, 4660, 2614, 2623, 4675, 2630, 585, 2634, 591, 2654, 609, 4706, 611, 2660, 4710, 4715, 620, 630, 639, 4735, 2695, 2699, 653, 2706, 2715, 4764, 2721, 691, 692, 701, 2750, 4801, 4802, 709, 713, 2761, 2762, 4810, 2765, 2767, 723, 4820, 725, 728, 4824, 2783, 738, 4835, 741, 746, 2796, 2800, 2801, 757, 2805, 759, 4854, 4859, 777, 2825, 2827, 2829, 2832, 785, 2841, 794, 2842, 4892, 2847, 4896, 801, 2849, 4904, 811, 812, 2862, 2863, 4913, 4917, 822, 824, 4920, 4922, 4927, 836, 2884, 4935, 840, 2892, 4942, 4946, 2901, 858, 863, 865, 866, 873, 4971, 876, 4974, 2929, 2932, 886, 4989, 894, 895, 4990, 904, 908, 2956, 911, 2963, 2971, 2972, 927, 2977, 2978, 936, 2991, 3005, 959, 3007, 3010, 965, 966, 968, 3016, 970, 3020, 3023, 3024, 977, 3032, 985, 3038, 991, 3044, 3046, 3057, 3063, 3065, 1019, 1022, 1024, 1026, 3080, 3082, 1038, 3086, 3089, 3094, 3100, 1053, 1054, 3101, 1057, 1058, 1063, 3116, 1070, 1071, 3118, 3119, 3120, 1076, 3128, 3144, 1100, 1102, 3153, 1106, 1108, 3157, 3158, 3159, 3165, 1120, 3169, 3174, 3176, 1130, 1131, 3183, 1150, 3200, 1153, 3205, 1161, 3211, 1166, 1172, 3229, 1182, 3242, 1199, 1210, 1215, 1219, 1220, 1222, 3271, 1241, 3291, 1244, 3293, 1252, 3301, 1261, 1262, 1263, 3309, 3316, 1270, 3345, 1300, 3353, 1310, 1315, 1316, 3364, 1319, 1322, 3373, 1326, 1330, 3380, 1334, 3385, 1339, 1340, 3388, 1355, 3403, 3405, 1361, 1367, 1369, 3417, 3422, 1375, 1378, 1385, 3442, 1400, 1405, 3457, 1414, 1417, 3465, 3471, 3490, 1443, 1445, 3500, 1463, 1464, 3515, 1472, 3523, 3524, 1481, 3534, 1490, 1496, 1501, 1502, 3551, 1517, 3568, 1540, 1542, 3592, 3610, 1569, 3617, 1576, 1577, 3630, 3631, 1585, 1596, 3644, 3648, 3652, 1611, 3661, 1614, 1619, 3667, 1622, 1631, 1635, 3690, 1643, 3691, 1645, 3695, 1648, 1652, 1657, 1659, 1670, 3721, 1676, 3724, 3725, 1682, 1689, 1690, 3737, 1694, 3747, 1702, 3750, 1708, 3766, 1719, 1720, 1729, 1730, 1731, 1732, 3783, 1736, 3785, 3786, 1744, 1746, 3797, 1751, 1753, 3801, 3803, 3805, 1758, 1759, 1769, 3823, 3833, 1786, 3841, 3849, 1814, 3870, 3873, 1826, 1827, 3878, 1834, 1845, 3897, 3899, 3906, 1859, 1865, 3916, 3918, 1884, 1886, 1888, 1893, 3955, 1909, 1911, 3959, 1914, 3964, 1917, 3974, 3980, 1936, 1939, 1944, 1948, 3999, 1957, 1958, 1963, 4012, 4015, 1968, 4016, 1974, 4029, 1982, 1983, 4030, 1987, 1995, 4046, 2003, 4051, 4053, 2008, 4058, 4059, 2014, 2019, 4071, 4075, 4079, 4085, 4093, 4095}
 _FILES = list(set(range(5000)) - set(_NAN_FILES))
@@ -38,7 +37,7 @@ _CHANNELS = 180
 class DukeUltranet(tfds.core.BeamBasedBuilder):
     """TODO(duke_ultranet): Short description of my dataset."""
 
-    VERSION = tfds.core.Version('0.1.0')
+    VERSION = tfds.core.Version('0.1.1')
     BUILDER_CONFIGS = [
         tfds.core.BuilderConfig(
             version=VERSION,
@@ -282,25 +281,31 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
             tfds.core.SplitGenerator(
                     name=tfds.Split.TRAIN,
                     gen_kwargs={
-                        'files': _FILES[:3000]
-                    },
-            ),
-            tfds.core.SplitGenerator(
-                    name=tfds.Split.TEST,
-                    gen_kwargs={
-                        'files': _FILES[3000:]
-                    },
-            ),
+                        'files': _FILES
+                    }
+            )
         ]
 
     def _build_pcollection(self, pipeline, files):
         beam = tfds.core.lazy_imports.apache_beam
 
-        def _process(file_num):
-            metadata_filepath = 'gs://duke-research-us/hindexbooster/results/val_{}/structs_42.mat'.format(file_num)
-            target_jpeg_filepath = 'gs://duke-research-us/hindexbooster/images/val_{}.JPEG'.format(file_num+5000)
-            body_jpeg_filepath = 'gs://duke-research-us/hindexbooster/images/val_{}.JPEG'.format(file_num)
-            filepaths_rf = ['gs://duke-research-us/hindexbooster/results/val_{}/rf_{}.mat'.format(file_num, str(i).zfill(2)) for i in range(1,len(_TX_POS)+1)]
+        filepaths_rf = []
+        for file_num in files:
+            for i in range(1,len(_TX_POS)+1):
+                filepaths_rf.append((file_num, '{}/results/val_{}/rf_{}.mat'.format(_BUCKET, file_num, str(i).zfill(2))))
+
+        def _download_rf(job):
+            file_num, filepath = tuple(job)
+            data = DukeUltranet.get_rf_hdf5(filepath)
+            beam.metrics.Metrics.counter('results', "rf-downloaded").inc()
+            yield file_num, data
+
+        def _process(job):
+            file_num, rf = tuple(job)
+
+            metadata_filepath = '{}/results/val_{}/structs_42.mat'.format(_BUCKET, file_num)
+            target_jpeg_filepath = '{}/images/val_{}.JPEG'.format(_BUCKET, file_num+5000)
+            body_jpeg_filepath = '{}/images/val_{}.JPEG'.format(_BUCKET, file_num)
             
             m = h5py.File(tf.io.gfile.GFile(metadata_filepath, 'rb'), mode='r')
             elements = m.get('/xdc/out')[()].shape[-1]
@@ -363,15 +368,13 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
             
             a = common['probe']['a'].astype(np.float32)
             b = common['probe']['b'].astype(np.float32)
-            
-            # Download RF data
-            with futures.ThreadPoolExecutor() as executor:
-                rf = executor.map(self.get_rf_hdf5, filepaths_rf)
+
             rf = list(rf)
             nowall = np.stack([r['nowall'] for r in rf])
-            wall = np.stack([r['wall'] for r in rf])          
+            wall = np.stack([r['wall'] for r in rf])
             nowall = signal.lfilter(b, a, nowall, axis=-1)
             wall = signal.lfilter(b, a, wall, axis=-1)
+            rf = None
             
             if self.builder_config.name is 'channel':
                 varying = {
@@ -379,7 +382,7 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
                     'without_wall': nowall,
                     'with_wall': wall
                 }
-                
+
             if self.builder_config.name is 'dynamic_rx_beamformed' or self.builder_config.name is 'b_mode':
                 s = self.beamform_dynamic_rx(nowall.shape, 
                                              common['probe']['tx_positions'], 
@@ -409,7 +412,8 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
                     'with_wall': wall
                 }
             m.close()
-        
+
+            beam.metrics.Metrics.counter('results', "rf-processed").inc()
             yield file_num, {
                 'data': varying,
                 'params': common
@@ -417,6 +421,8 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
 
         return (
             pipeline
-            | beam.Create(files)
+            | beam.Create(filepaths_rf)
+            | beam.FlatMap(_download_rf)
+            | beam.GroupByKey()
             | beam.FlatMap(_process)
         )

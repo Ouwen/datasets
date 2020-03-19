@@ -421,7 +421,7 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
 
         return (
             pipeline
-            | beam.Create(filepaths_rf)
+            | beam.Create(filepaths_rf, reshuffle=False)
             | beam.FlatMap(_download_rf)
             | beam.GroupByKey()
             | beam.FlatMap(_process)

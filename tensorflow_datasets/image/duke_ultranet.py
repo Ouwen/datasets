@@ -327,8 +327,9 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
             yield file_num, data
 
         def _check_size(job):
-            file_num, data = job
-            return len(data) == 85
+            file_num, rf = job
+            list(rf)
+            return len(rf) == 85
 
         def _process(job):
             file_num, rf = tuple(job)
@@ -461,7 +462,7 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
             pipeline
             | beam.Create(filepaths_rf, reshuffle=False)
             | beam.FlatMap(_download_rf)
-            | beam.Filter(_check_size)
             | beam.GroupByKey()
+            | beam.Filter(_check_size)
             | beam.FlatMap(_process)
         )

@@ -317,14 +317,17 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
         def _download_rf(job):
             file_num, filepath, i = tuple(job)
             data = None
-            while data is None:
-                try:
-                    data = DukeUltranet.get_rf_hdf5(filepath, i)
-                except Exception as e:
-                    logging.error(filepath)
-                    beam.metrics.Metrics.counter('results', "download-error").inc()
+            try:
+                data = DukeUltranet.get_rf_hdf5(filepath, i)
+            except Exception as e:
+                logging.error(filepath)
+                beam.metrics.Metrics.counter('results', "download-error").inc()
+                return
             beam.metrics.Metrics.counter('results', "rf-downloaded").inc()
             yield file_num, data
+
+        def _check_size(data):
+            return len(data) == 85
 
         def _process(job):
             file_num, rf = tuple(job)
@@ -457,6 +460,7 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
             pipeline
             | beam.Create(filepaths_rf, reshuffle=False)
             | beam.FlatMap(_download_rf)
+            | beam.Filter(_check_size)
             | beam.GroupByKey()
             | beam.FlatMap(_process)
         )

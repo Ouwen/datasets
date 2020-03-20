@@ -328,7 +328,7 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
 
         def _check_size(job):
             file_num, rf = job
-            list(rf)
+            rf = list(rf)
             return len(rf) == 85
 
         def _process(job):

@@ -37,7 +37,7 @@ _CHANNELS = 180
 class DukeUltranet(tfds.core.BeamBasedBuilder):
     """TODO(duke_ultranet): Short description of my dataset."""
 
-    VERSION = tfds.core.Version('0.1.1')
+    VERSION = tfds.core.Version('0.1.2')
     BUILDER_CONFIGS = [
         tfds.core.BuilderConfig(
             version=VERSION,
@@ -57,13 +57,14 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
     ]
     
     @staticmethod
-    def get_rf_hdf5(filepath):
+    def get_rf_hdf5(filepath, i):
         with h5py.File(tf.io.gfile.GFile(filepath, 'rb'), mode='r') as f:
             nowall = f.get('rf_nowall')[()]
             wall = f.get('rf_wall')[()]
         return {
             'nowall': nowall,
-            'wall': wall
+            'wall': wall,
+            'i': i
         }
     
     @staticmethod
@@ -249,8 +250,8 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
                 description=_DESCRIPTION['dynamic_rx_beamformed'],
                 features=tfds.features.FeaturesDict({
                     'data': {
-                        'without_wall': tfds.features.Tensor(shape=(len(_TX_POS),_CHANNELS,3117), dtype=tf.float16),
-                        'with_wall': tfds.features.Tensor(shape=(len(_TX_POS),_CHANNELS,3117), dtype=tf.float16),
+                        'without_wall': tfds.features.Tensor(shape=(len(_TX_POS),_CHANNELS,3117), dtype=tf.float32),
+                        'with_wall': tfds.features.Tensor(shape=(len(_TX_POS),_CHANNELS,3117), dtype=tf.float32)
                     },
                     'params': common
                 }),
@@ -292,11 +293,11 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
         filepaths_rf = []
         for file_num in files:
             for i in range(1,len(_TX_POS)+1):
-                filepaths_rf.append((file_num, '{}/results/val_{}/rf_{}.mat'.format(_BUCKET, file_num, str(i).zfill(2))))
+                filepaths_rf.append((file_num, '{}/results/val_{}/rf_{}.mat'.format(_BUCKET, file_num, str(i).zfill(2)), i))
 
         def _download_rf(job):
-            file_num, filepath = tuple(job)
-            data = DukeUltranet.get_rf_hdf5(filepath)
+            file_num, filepath, i = tuple(job)
+            data = DukeUltranet.get_rf_hdf5(filepath, i)
             beam.metrics.Metrics.counter('results', "rf-downloaded").inc()
             yield file_num, data
 
@@ -370,12 +371,19 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
             b = common['probe']['b'].astype(np.float32)
 
             rf = list(rf)
-            nowall = np.stack([r['nowall'] for r in rf])
-            wall = np.stack([r['wall'] for r in rf])
+            ordering = np.array([r['i'] for r in rf])
+            ordering = list(np.argsort(ordering))
+            nowall = []
+            wall = []
+            for idx in ordering:
+                nowall.append(rf[idx]['nowall'])
+                wall.append(rf[idx]['wall'])
+            nowall = np.stack(nowall)
+            wall = np.stack(wall)
+            rf = None
             nowall = signal.lfilter(b, a, nowall, axis=-1)
             wall = signal.lfilter(b, a, wall, axis=-1)
-            rf = None
-            
+
             if self.builder_config.name is 'channel':
                 varying = {
                     'cmap': np.squeeze(m.get('field_maps/cmap')[()]),
@@ -390,25 +398,24 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
                                              s0=common['probe']['t0']*common['fs'], 
                                              fs=common['fs'], data_dtype=tf.float64)
                 s = tf.cast(s, tf.float32)
-                nowall = self.apply_delays(s, nowall)[..., 3117:6234].numpy().astype(np.float16)
-                wall = self.apply_delays(s, wall)[..., 3117:6234].numpy().astype(np.float16)
-                s = None
+                nowall = self.apply_delays(s, nowall)[..., 3117:6234]
+                wall = self.apply_delays(s, wall)[..., 3117:6234]
 
                 varying = {
                     'without_wall': nowall,
                     'with_wall': wall
                 }
-            
+
             if self.builder_config.name is 'b_mode':
                 on_mask = tf.cast(common['probe']['element_on_mask'][..., None], tf.float16)
                 env = tf.abs(self.tf_hilbert(tf.reduce_sum(nowall*on_mask, axis=1), axis=-1))
                 env = env/tf.reduce_max(env)
                 nowall = self.tf_db(env)
-                
+
                 env = tf.abs(self.tf_hilbert(tf.reduce_sum(wall*on_mask, axis=1), axis=-1))
                 env = env/tf.reduce_max(env)
                 wall = self.tf_db(env)
-                
+
                 varying = {
                     'without_wall': nowall,
                     'with_wall': wall

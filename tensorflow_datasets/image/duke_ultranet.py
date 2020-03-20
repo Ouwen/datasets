@@ -17,7 +17,24 @@ _CITATION = """
 # TODO(duke_ultranet):
 _DESCRIPTION = {
     'channel': '',
-    'dynamic_rx_beamformed': '',
+    'dynamic_rx_beamformed': '''
+        Processing script
+        
+        DATASET_NAME=duke_ultranet/dynamic_rx_beamformed
+        GCP_PROJECT=duke-ultrasound
+        GCS_BUCKET=gs://duke-research-us
+        
+        echo "git+git://github.com/ouwen/datasets@master" > /tmp/beam_requirements.txt
+        python3 -m tensorflow_datasets.scripts.download_and_prepare \
+          --datasets=$DATASET_NAME \
+          --data_dir=$GCS_BUCKET/tensorflow_datasets \
+          --beam_pipeline_options=\
+        "runner=DataflowRunner,project=$GCP_PROJECT,job_name=duke-ultranet-dynamic-rx-beamformed-gen,"\
+        "staging_location=$GCS_BUCKET/binaries,temp_location=$GCS_BUCKET/temp,"\
+        "requirements_file=/tmp/beam_requirements.txt,region=us-east1,"\
+        "autoscaling_algorithm=NONE,num_workers=10,"\
+        "machine_type=n1-highmem-16,experiments=shuffle_mode=service"
+    ''',
     'b_mode': ''
 }
 

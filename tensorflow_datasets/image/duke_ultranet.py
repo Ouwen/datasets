@@ -54,7 +54,7 @@ _CHANNELS = 180
 class DukeUltranet(tfds.core.BeamBasedBuilder):
     """TODO(duke_ultranet): Short description of my dataset."""
 
-    VERSION = tfds.core.Version('0.1.3')
+    VERSION = tfds.core.Version('0.1.4')
     BUILDER_CONFIGS = [
         tfds.core.BuilderConfig(
             version=VERSION,
@@ -300,7 +300,7 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
                     name=tfds.Split.TRAIN,
                     num_shards=200,
                     gen_kwargs={
-                        'files': _FILES[:200]
+                        'files': _FILES[200:500]
                     }
             )
         ]

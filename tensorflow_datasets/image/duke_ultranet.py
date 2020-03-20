@@ -9,6 +9,7 @@ import tensorflow.compat.v2 as tf
 import tensorflow_datasets.public_api as tfds
 from scipy import signal
 import h5py
+import logging
 
 # TODO(duke_ultranet): BibTeX citation
 _CITATION = """
@@ -72,18 +73,26 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
             description="B mode image."
         )
     ]
-    
+
     @staticmethod
     def get_rf_hdf5(filepath, i):
-        with h5py.File(tf.io.gfile.GFile(filepath, 'rb'), mode='r') as f:
-            nowall = f.get('rf_nowall')[()]
-            wall = f.get('rf_wall')[()]
+        nowall = None
+        wall = None
+        while nowall is None or wall is None:
+            try:
+                with h5py.File(tf.io.gfile.GFile(filepath, 'rb'), mode='r') as f:
+                    nowall = f.get('rf_nowall')[()]
+                    wall = f.get('rf_wall')[()]
+            except Exception as e:
+                logging.error(filepath)
+                beam.metrics.Metrics.counter('results', "download-error").inc()
+
         return {
             'nowall': nowall,
             'wall': wall,
             'i': i
         }
-    
+
     @staticmethod
     @tf.function
     def tf_hilbert(x, axis=-1):
@@ -314,13 +323,8 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
 
         def _download_rf(job):
             file_num, filepath, i = tuple(job)
-            try:
-                data = DukeUltranet.get_rf_hdf5(filepath, i)
-                beam.metrics.Metrics.counter('results', "rf-downloaded").inc()
-            except Exception as e:
-                print("Error", file_num, filepath)
-                beam.metrics.Metrics.counter('results', "download-error").inc()
-                return
+            data = DukeUltranet.get_rf_hdf5(filepath, i)
+            beam.metrics.Metrics.counter('results', "rf-downloaded").inc()
             yield file_num, data
 
         def _process(job):
@@ -455,6 +459,5 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
             | beam.Create(filepaths_rf, reshuffle=False)
             | beam.FlatMap(_download_rf)
             | beam.GroupByKey()
-            | beam.transforms.Reshuffle()
             | beam.FlatMap(_process)
         )

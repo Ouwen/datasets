@@ -54,7 +54,7 @@ _CHANNELS = 180
 class DukeUltranet(tfds.core.BeamBasedBuilder):
     """TODO(duke_ultranet): Short description of my dataset."""
 
-    VERSION = tfds.core.Version('0.1.4')
+    VERSION = tfds.core.Version('0.2.0')
     BUILDER_CONFIGS = [
         tfds.core.BuilderConfig(
             version=VERSION,
@@ -298,9 +298,8 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
         return [
             tfds.core.SplitGenerator(
                     name=tfds.Split.TRAIN,
-                    num_shards=200,
                     gen_kwargs={
-                        'files': _FILES[200:500]
+                        'files': _FILES
                     }
             )
         ]
@@ -315,8 +314,13 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
 
         def _download_rf(job):
             file_num, filepath, i = tuple(job)
-            data = DukeUltranet.get_rf_hdf5(filepath, i)
-            beam.metrics.Metrics.counter('results', "rf-downloaded").inc()
+            try:
+                data = DukeUltranet.get_rf_hdf5(filepath, i)
+                beam.metrics.Metrics.counter('results', "rf-downloaded").inc()
+            except Exception as e:
+                print("Error", file_num, filepath)
+                beam.metrics.Metrics.counter('results', "download-error").inc()
+                return
             yield file_num, data
 
         def _process(job):
@@ -451,5 +455,6 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
             | beam.Create(filepaths_rf, reshuffle=False)
             | beam.FlatMap(_download_rf)
             | beam.GroupByKey()
+            | beam.transforms.Reshuffle()
             | beam.FlatMap(_process)
         )

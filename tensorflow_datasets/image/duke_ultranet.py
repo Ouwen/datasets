@@ -326,7 +326,8 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
             beam.metrics.Metrics.counter('results', "rf-downloaded").inc()
             yield file_num, data
 
-        def _check_size(data):
+        def _check_size(job):
+            file_num, data = job
             return len(data) == 85
 
         def _process(job):

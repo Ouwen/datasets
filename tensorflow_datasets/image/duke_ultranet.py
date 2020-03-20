@@ -76,17 +76,9 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
 
     @staticmethod
     def get_rf_hdf5(filepath, i):
-        nowall = None
-        wall = None
-        while nowall is None or wall is None:
-            try:
-                with h5py.File(tf.io.gfile.GFile(filepath, 'rb'), mode='r') as f:
-                    nowall = f.get('rf_nowall')[()]
-                    wall = f.get('rf_wall')[()]
-            except Exception as e:
-                logging.error(filepath)
-                beam.metrics.Metrics.counter('results', "download-error").inc()
-
+        with h5py.File(tf.io.gfile.GFile(filepath, 'rb'), mode='r') as f:
+            nowall = f.get('rf_nowall')[()]
+            wall = f.get('rf_wall')[()]
         return {
             'nowall': nowall,
             'wall': wall,
@@ -324,7 +316,13 @@ class DukeUltranet(tfds.core.BeamBasedBuilder):
 
         def _download_rf(job):
             file_num, filepath, i = tuple(job)
-            data = DukeUltranet.get_rf_hdf5(filepath, i)
+            data = None
+            while data is None:
+                try:
+                    data = DukeUltranet.get_rf_hdf5(filepath, i)
+                except Exception as e:
+                    logging.error(filepath)
+                    beam.metrics.Metrics.counter('results', "download-error").inc()
             beam.metrics.Metrics.counter('results', "rf-downloaded").inc()
             yield file_num, data
 
